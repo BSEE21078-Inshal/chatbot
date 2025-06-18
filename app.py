@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 import json
-from langchain.vectorstores import FAISS
+from langchain.vectorstores import DocArrayInMemorySearch
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.schema import Document
 import os
@@ -45,7 +45,7 @@ def query_llama3(prompt: str):
         raise Exception(f"Error {response.status_code}: {response.text}")
     return response.json()["choices"][0]["message"]["content"]
 
-# === Load patient case memory (embedded in code) ===
+# === Load patient case memory ===
 @st.cache_resource
 def load_case_memory():
     data = [
@@ -66,11 +66,12 @@ def load_case_memory():
         )
         for r in data
     ]
-    return FAISS.from_documents(cases, HuggingFaceEmbeddings())
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    return DocArrayInMemorySearch.from_documents(cases, embeddings)
 
 retriever = load_case_memory().as_retriever(search_kwargs={"k": 5})
 
-# === General Chat Mode ===
+# === Main Interface ===
 if mode == "General Chat":
     st.subheader("💬 Ask any question about breast cancer")
     user_question = st.text_input("Type your question here:")
@@ -79,7 +80,6 @@ if mode == "General Chat":
         st.markdown("### 🧠 Answer")
         st.markdown(reply)
 
-# === Detection Support Mode ===
 elif mode == "Detection Support":
     questions = [
         "How old are you? (e.g., 45, 52, 60)",
